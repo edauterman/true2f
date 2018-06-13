@@ -1,0 +1,13 @@
+import os
+
+Import('env')
+
+penv = env.Clone()
+
+src = [
+    "vrf.c",
+]
+
+penv.Append(LIBS = [])
+penv.StaticLibrary("detu2f", src)
+
