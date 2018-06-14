@@ -1,0 +1,16 @@
+import os
+
+Import('env')
+
+penv = env.Clone()
+
+src = [
+    "vrf_test.cpp",
+]
+
+penv.Append(LIBS = ["gtest", "gtest_main"], 
+  CFLAGS=["-I/usr/local/include"],
+  LIBPATH=["/usr/local/lib"])
+
+penv.Program("dettest", src)
+

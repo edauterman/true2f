@@ -122,8 +122,8 @@ conf.Finish()
 Export('env')
 
 # Set compile options for binaries
-env.Append(LIBS = ["crypto","gtest"], \
-  LIBPATH = ['#build/src','#build/gtest/googletest/make/'])
+env.Append(LIBS = ["crypto"], LIBPATH = ['#build/src'])
 
 SConscript('src/SConscript', variant_dir='build/src')
+SConscript('test/SConscript', variant_dir='build/test')
 
