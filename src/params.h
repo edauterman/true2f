@@ -1,3 +1,6 @@
+#ifndef _PARAMS_H
+#define _PARAMS_H
+
 /*
  * Copyright (c) 2018, Henry Corrigan-Gibbs
  * 
@@ -14,49 +17,27 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <stdlib.h>
-#include "vrf.h"
+#ifdef __cplusplus
+extern "C"{
+#endif
 
-struct public_key {
-  EC_POINT *gx;
-};
+#include <openssl/ec.h>
 
-struct secret_key {
-  BIGNUM *x;
-};
+struct params;
 
+typedef struct params* Params;
+typedef const struct params* const_Params;
 
-PublicKey 
-PublicKey_new (void)
-{
-  PublicKey pk = NULL;
-  pk = malloc (sizeof *pk);
-  if (!pk)
-    return NULL;
+typedef enum {
+  P256 = 1, 
+  P384 = 2, 
+  P521 = 3 
+} CurveName;
 
-  return pk;
+Params Params_new (CurveName c);
+void Params_free (Params p);
+
+#ifdef __cplusplus
 }
-
-void 
-PublicKey_free (PublicKey key)
-{
-  free (key);
-}
-
-/*
-SecretKey 
-SecretKey_new (void)
-{
-
-}
-
-void 
-SecretKey_free (SecretKey key)
-{
-
-}
-*/
-
-
-
-
+#endif
+#endif

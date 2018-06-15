@@ -1,3 +1,6 @@
+#ifndef _VRF_H
+#define _VRF_H
+
 /*
  * Copyright (c) 2018, Henry Corrigan-Gibbs
  * 
@@ -14,8 +17,18 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <gtest/gtest.h> 
+#include <openssl/ec.h>
 
-TEST(VRF, DoNothing) {
-    EXPECT_EQ(1, 1);
-}
+struct public_key;
+struct secret_key;
+
+typedef struct public_key* PublicKey;
+typedef const struct secret_key* SecretKey;
+
+PublicKey PublicKey_new (void);
+void PublicKey_free (PublicKey key);
+
+SecretKey SecretKey_new (void);
+void SecretKey_free (SecretKey key);
+
+#endif

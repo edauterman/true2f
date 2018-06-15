@@ -5,9 +5,10 @@ Import('env')
 penv = env.Clone()
 
 src = [
+    "params.c",
     "vrf.c",
 ]
 
 penv.Append(LIBS = [])
-penv.StaticLibrary("detu2f", src)
+penv.StaticLibrary("det2f", src)
 

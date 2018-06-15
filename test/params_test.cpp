@@ -14,49 +14,14 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <stdlib.h>
-#include "vrf.h"
+#include <gtest/gtest.h> 
+#include "src/params.h"
 
-struct public_key {
-  EC_POINT *gx;
-};
+TEST(Params, InitP256) {
+  Params p = NULL;
+  p = Params_new (P256);
+  EXPECT_TRUE (p != NULL);
 
-struct secret_key {
-  BIGNUM *x;
-};
-
-
-PublicKey 
-PublicKey_new (void)
-{
-  PublicKey pk = NULL;
-  pk = malloc (sizeof *pk);
-  if (!pk)
-    return NULL;
-
-  return pk;
+  if (p)
+    Params_free (p);
 }
-
-void 
-PublicKey_free (PublicKey key)
-{
-  free (key);
-}
-
-/*
-SecretKey 
-SecretKey_new (void)
-{
-
-}
-
-void 
-SecretKey_free (SecretKey key)
-{
-
-}
-*/
-
-
-
-

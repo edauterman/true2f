@@ -15,48 +15,59 @@
  */
 
 #include <stdlib.h>
-#include "vrf.h"
+#include "params.h"
 
-struct public_key {
-  EC_POINT *gx;
+#define NID_P256 714
+#define NID_P384 715
+#define NID_P521 716
+
+struct params {
+  EC_GROUP *group;
 };
 
-struct secret_key {
-  BIGNUM *x;
-};
-
-
-PublicKey 
-PublicKey_new (void)
+static int
+curve_name_to_nid (CurveName c) 
 {
-  PublicKey pk = NULL;
-  pk = malloc (sizeof *pk);
-  if (!pk)
+  switch (c) {
+    case P256:
+      return NID_P256;
+    case P384:
+      return NID_P384;
+    case P521:
+      return NID_P521;
+  }
+  return 0;
+}
+
+Params 
+Params_new (CurveName c)
+{
+  Params p = NULL;
+  p->group = NULL;
+
+  int nid = curve_name_to_nid (c);
+  if (!nid)
     return NULL;
 
-  return pk;
+  p = malloc (sizeof *p);
+  if (!p)
+    return NULL;
+
+  p->group = EC_GROUP_new_by_curve_name (nid);
+  if (!p->group) {
+    Params_free (p);
+    return NULL;
+  }
+
+  return p;
 }
 
 void 
-PublicKey_free (PublicKey key)
+Params_free (Params p)
 {
-  free (key);
+  if (p->group) 
+    EC_GROUP_clear_free (p->group);
+  free (p);
 }
-
-/*
-SecretKey 
-SecretKey_new (void)
-{
-
-}
-
-void 
-SecretKey_free (SecretKey key)
-{
-
-}
-*/
-
-
 
 
