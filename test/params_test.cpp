@@ -17,11 +17,18 @@
 #include <gtest/gtest.h> 
 #include "src/params.h"
 
-TEST(Params, InitP256) {
+class ParamTest : public ::testing::TestWithParam<CurveName> {
+};
+
+TEST_P (ParamTest, Init) {
   Params p = NULL;
-  p = Params_new (P256);
+  p = Params_new (GetParam());
   EXPECT_TRUE (p != NULL);
 
   if (p)
     Params_free (p);
 }
+
+INSTANTIATE_TEST_CASE_P (Init,
+                        ParamTest,
+                        ::testing::Values(P256, P384, P521));
