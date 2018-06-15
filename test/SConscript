@@ -9,7 +9,7 @@ src = [
     "vrf_test.cpp",
 ]
 
-penv.Append(LIBS = ["gtest", "gtest_main"], 
+penv.Append(LIBS = ["gtest", "gtest_main", "pthread"], 
   CPPFLAGS = ["-I/usr/local/include", "-I."],
   LIBPATH = ["/usr/local/lib"])
 

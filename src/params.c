@@ -43,7 +43,6 @@ Params
 Params_new (CurveName c)
 {
   Params p = NULL;
-  p->group = NULL;
 
   int nid = curve_name_to_nid (c);
   if (!nid)
@@ -53,6 +52,7 @@ Params_new (CurveName c)
   if (!p)
     return NULL;
 
+  p->group = NULL;
   p->group = EC_GROUP_new_by_curve_name (nid);
   if (!p->group) {
     Params_free (p);
