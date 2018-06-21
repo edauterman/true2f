@@ -23,7 +23,7 @@ struct public_key;
 struct secret_key;
 
 typedef struct public_key* PublicKey;
-typedef const struct secret_key* SecretKey;
+typedef struct secret_key* SecretKey;
 
 PublicKey PublicKey_new (void);
 void PublicKey_free (PublicKey key);

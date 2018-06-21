@@ -16,6 +16,7 @@
 
 #include <stdlib.h>
 #include "params.h"
+#include "vrf.h"
 
 #define NID_P256 714
 #define NID_P384 715
@@ -23,6 +24,8 @@
 
 struct params {
   EC_GROUP *group;
+  PublicKey mpk;
+  SecretKey msk;
 };
 
 static int
@@ -59,6 +62,9 @@ Params_new (CurveName c)
     return NULL;
   }
 
+  p->mpk = PublicKey_new();
+  p->msk = SecretKey_new();
+
   return p;
 }
 
@@ -67,6 +73,12 @@ Params_free (Params p)
 {
   if (p->group) 
     EC_GROUP_clear_free (p->group);
+
+  if (p->mpk)
+    PublicKey_free(p->mpk);
+
+  if (p->msk)
+    SecretKey_free(p->msk);
   free (p);
 }
 

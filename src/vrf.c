@@ -43,20 +43,20 @@ PublicKey_free (PublicKey key)
   free (key);
 }
 
-/*
+
 SecretKey 
 SecretKey_new (void)
 {
+  SecretKey sk = NULL;
+  sk = malloc (sizeof *sk);
+  if (!sk)
+    return NULL;
 
+  return sk;
 }
 
 void 
 SecretKey_free (SecretKey key)
 {
-
+  free (key);
 }
-*/
-
-
-
-
