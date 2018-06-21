@@ -18,15 +18,39 @@
 #include "src/params.h"
 
 class ParamTest : public ::testing::TestWithParam<CurveName> {
+  public:
+    Params p;
+
+  virtual void SetUp() {
+    p = Params_new (GetParam());
+    EXPECT_TRUE (p != NULL);
+
+  }
+
+  virtual void TearDown() {
+    if (p)
+      Params_free (p);
+  }
 };
 
-TEST_P (ParamTest, Init) {
-  Params p = NULL;
-  p = Params_new (GetParam());
-  EXPECT_TRUE (p != NULL);
 
-  if (p)
-    Params_free (p);
+TEST_P (ParamTest, Init) {
+  // Just tests setup and teardown
+  EXPECT_TRUE (true);
+}
+
+TEST_P (ParamTest, RandPoint) {
+  BIGNUM *x = NULL;
+  
+  x = BN_new ();
+  EXPECT_TRUE (x);
+  if (!x) {
+    BN_free (x);
+    return;
+  }
+
+  EXPECT_TRUE (OKAY == Params_rand_exponent (p, x));
+  BN_free (x);
 }
 
 INSTANTIATE_TEST_CASE_P (Init,

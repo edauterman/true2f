@@ -27,20 +27,29 @@ struct secret_key {
 
 
 PublicKey 
-PublicKey_new (void)
+PublicKey_new (Params params)
 {
   PublicKey pk = NULL;
   pk = malloc (sizeof *pk);
   if (!pk)
     return NULL;
 
+  pk->gx = NULL;
+  pk->gx = EC_POINT_new (Params_group(params));
+  if (!pk->gx) {
+    PublicKey_free (pk);
+    return NULL;
+  }
+
   return pk;
 }
 
 void 
-PublicKey_free (PublicKey key)
+PublicKey_free (PublicKey pk)
 {
-  free (key);
+  if (pk->gx)
+    EC_POINT_clear_free (pk->gx);
+  free (pk);
 }
 
 
@@ -52,11 +61,34 @@ SecretKey_new (void)
   if (!sk)
     return NULL;
 
+  sk->x = NULL;
+  sk->x = BN_new ();
+  if (!sk->x) {
+    SecretKey_free (sk);
+    return NULL;
+  }
+
   return sk;
 }
 
 void 
-SecretKey_free (SecretKey key)
+SecretKey_free (SecretKey sk)
 {
-  free (key);
+  if (sk->x)
+    BN_clear_free (sk->x);    
+  free (sk);
 }
+
+int 
+VRF_keygen (Params p, PublicKey *pk_out, SecretKey *sk_out)
+{
+  int error = OKAY;
+  if (((error = Params_rand_exponent (p, (*sk_out)->x))) != OKAY)
+    return error;
+
+  if (((error = Params_exp (p, (*pk_out)->gx, (*sk_out)->x))) != OKAY)
+    return error;
+
+  return error; 
+}
+

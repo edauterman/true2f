@@ -24,8 +24,8 @@
 
 struct params {
   EC_GROUP *group;
-  PublicKey mpk;
-  SecretKey msk;
+  BIGNUM *order;
+  BN_CTX *ctx;
 };
 
 static int
@@ -56,14 +56,36 @@ Params_new (CurveName c)
     return NULL;
 
   p->group = NULL;
+  p->order = NULL;
+  p->ctx = NULL;
   p->group = EC_GROUP_new_by_curve_name (nid);
   if (!p->group) {
     Params_free (p);
     return NULL;
   }
 
-  p->mpk = PublicKey_new();
-  p->msk = SecretKey_new();
+  p->order = BN_new();
+  if (!p->group) {
+    Params_free (p);
+    return NULL;
+  }
+
+  if (!EC_GROUP_get_order (p->group, p->order, NULL)) {
+    Params_free (p);
+    return NULL;
+  }
+
+  if (!(p->ctx = BN_CTX_new ())) {
+    Params_free (p);
+    return NULL;
+  }
+
+  // Precompute powers of g for faster multiplication
+  if (!EC_GROUP_precompute_mult (p->group, p->ctx)) {
+    Params_free (p);
+    return NULL;
+  }
+
 
   return p;
 }
@@ -73,13 +95,50 @@ Params_free (Params p)
 {
   if (p->group) 
     EC_GROUP_clear_free (p->group);
+  if (p->order) 
+    BN_free (p->order);
+  if (p->ctx) 
+    BN_CTX_free (p->ctx);
 
-  if (p->mpk)
-    PublicKey_free(p->mpk);
-
-  if (p->msk)
-    SecretKey_free(p->msk);
   free (p);
 }
 
+const EC_GROUP *
+Params_group (Params p) 
+{
+  return p->group;
+}
+
+int 
+Params_rand_point (Params p, EC_POINT *point)
+{
+  BIGNUM *exp = NULL;
+  exp = BN_new ();
+
+  if (!exp) return ERROR;
+  if (Params_rand_exponent (p, exp) != OKAY) {
+    BN_clear_free (exp);
+    return ERROR;
+  }
+
+  int ret = Params_exp (p, point, exp);
+      
+  
+  BN_clear_free (exp);
+  return ret;
+}
+
+int 
+Params_rand_exponent (Params p, BIGNUM *x)
+{
+  // TODO: Generate a uniform number in the range [0, q).
+  int bits = BN_num_bits (p->order);
+  return BN_rand (x, bits, 0, 0) ? OKAY : ERROR;
+}
+
+int 
+Params_exp (Params p, EC_POINT *point, const BIGNUM *exp)
+{
+  return OKAY ? EC_POINT_mul (p->group, point, exp, NULL, NULL, p->ctx) : ERROR;
+}
 

@@ -23,10 +23,15 @@ extern "C"{
 
 #include <openssl/ec.h>
 
+/*
+ * Return codes. 
+ */
+#define OKAY 0
+#define ERROR 1
+
 struct params;
 
 typedef struct params* Params;
-typedef const struct params* const_Params;
 
 typedef enum {
   P256 = 1, 
@@ -36,6 +41,13 @@ typedef enum {
 
 Params Params_new (CurveName c);
 void Params_free (Params p);
+const EC_GROUP *Params_group (Params p);
+
+int Params_rand_point (Params p, EC_POINT *point);
+int Params_rand_exponent (Params p, BIGNUM *x);
+
+// Compute g^x where g is the fixed generator
+int Params_exp (Params p, EC_POINT *point, const BIGNUM *exponent);
 
 #ifdef __cplusplus
 }

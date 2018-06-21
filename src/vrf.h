@@ -18,17 +18,33 @@
  */
 
 #include <openssl/ec.h>
+#include "params.h"
 
 struct public_key;
 struct secret_key;
 
 typedef struct public_key* PublicKey;
+typedef const struct public_key* const_PublicKey;
 typedef struct secret_key* SecretKey;
+typedef const struct secret_key* const_SecretKey;
+typedef struct vrf_proof* VRFProof;
+typedef const struct vrf_proof* const_VRFProof;
 
-PublicKey PublicKey_new (void);
+PublicKey PublicKey_new (Params params);
 void PublicKey_free (PublicKey key);
 
 SecretKey SecretKey_new (void);
 void SecretKey_free (SecretKey key);
 
+int VRF_keygen (Params params, PublicKey *pk_out, SecretKey *sk_out);
+
+int VRF_eval (Params params, const_PublicKey master_pk, 
+    const uint8_t *input, int inputlen,
+    PublicKey *output_pk, SecretKey *output_sk, VRFProof *proof);
+
+int VRF_verify (Params params,
+    const_PublicKey mpk, const uint8_t *input, int inputlen,
+    const_PublicKey output_pk, const_VRFProof proof);
+
 #endif
+

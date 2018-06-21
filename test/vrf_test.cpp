@@ -16,6 +16,6 @@
 
 #include <gtest/gtest.h> 
 
-TEST(VRF, DoNothing) {
+TEST(VRF, KeyGen) {
     EXPECT_EQ(1, 1);
 }
