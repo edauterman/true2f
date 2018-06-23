@@ -41,16 +41,21 @@ TEST_P (ParamTest, Init) {
 
 TEST_P (ParamTest, RandPoint) {
   BIGNUM *x = NULL;
+  EC_POINT *pt = NULL;
   
   x = BN_new ();
   EXPECT_TRUE (x);
-  if (!x) {
-    BN_free (x);
-    return;
-  }
+  if (!x) goto cleanup;
+
+  pt = EC_POINT_new (Params_group (p));
 
   EXPECT_TRUE (OKAY == Params_rand_exponent (p, x));
+  EXPECT_TRUE (OKAY == Params_rand_point (p, pt));
   BN_free (x);
+
+cleanup:
+  if (x) BN_free (x);
+  if (pt) EC_POINT_free (pt);
 }
 
 INSTANTIATE_TEST_CASE_P (Init,

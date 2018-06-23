@@ -15,6 +15,7 @@
  */
 
 #include <stdlib.h>
+#include "common.h"
 #include "vrf.h"
 
 struct public_key {
@@ -80,15 +81,37 @@ SecretKey_free (SecretKey sk)
 }
 
 int 
-VRF_keygen (Params p, PublicKey *pk_out, SecretKey *sk_out)
+VRF_keygen (Params p, PublicKey pk_out, SecretKey sk_out)
 {
-  int error = OKAY;
-  if (((error = Params_rand_exponent (p, (*sk_out)->x))) != OKAY)
-    return error;
+  int rv = ERROR;
+  CHECK_C (Params_rand_exponent (p, sk_out->x));
+  CHECK_C (Params_exp (p, pk_out->gx, sk_out->x));
 
-  if (((error = Params_exp (p, (*pk_out)->gx, (*sk_out)->x))) != OKAY)
-    return error;
+cleanup:
+  return rv; 
+}
 
-  return error; 
+int 
+VRF_eval (Params params, const_SecretKey master_sk, 
+    const uint8_t *input, int inputlen,
+    PublicKey output_pk, SecretKey output_sk, VRFProof *proof)
+{
+  int rv;
+  const BIGNUM *q = Params_order (params);
+  BN_CTX *ctx = Params_ctx (params);
+  // x = Hash(input)
+  CHECK_C (Params_hash_to_exponent (params, output_sk->x, input, inputlen));
+
+  // x + sk  mod q
+  CHECK_C (BN_mod_add (output_sk->x, output_sk->x, master_sk->x, q, ctx)); 
+
+  // output = 1/(x + sk)  mod q
+  CHECK_A (BN_mod_inverse (output_sk->x, output_sk->x, q, ctx)); 
+
+  // Compute public key as g^output
+  CHECK_C (Params_exp (params, output_pk->gx, output_sk->x));
+
+cleanup:
+  return ERROR;
 }
 

@@ -15,6 +15,11 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+
+#include "common.h"
 #include "params.h"
 #include "vrf.h"
 
@@ -109,23 +114,33 @@ Params_group (Params p)
   return p->group;
 }
 
+const BIGNUM *
+Params_order (Params p) 
+{
+  return p->order;
+}
+
+BN_CTX *
+Params_ctx (Params p) 
+{
+  return p->ctx;
+}
+
 int 
 Params_rand_point (Params p, EC_POINT *point)
 {
+  int rv = ERROR;
   BIGNUM *exp = NULL;
   exp = BN_new ();
 
-  if (!exp) return ERROR;
-  if (Params_rand_exponent (p, exp) != OKAY) {
-    BN_clear_free (exp);
-    return ERROR;
-  }
+  CHECK_C ((exp != NULL));
+  CHECK_C (Params_rand_exponent (p, exp));
 
-  int ret = Params_exp (p, point, exp);
-      
-  
+  rv = Params_exp (p, point, exp);
+
+cleanup:
   BN_clear_free (exp);
-  return ret;
+  return rv;
 }
 
 int 
@@ -139,6 +154,73 @@ Params_rand_exponent (Params p, BIGNUM *x)
 int 
 Params_exp (Params p, EC_POINT *point, const BIGNUM *exp)
 {
-  return OKAY ? EC_POINT_mul (p->group, point, exp, NULL, NULL, p->ctx) : ERROR;
+  return EC_POINT_mul (p->group, point, exp, NULL, NULL, p->ctx) ? OKAY : ERROR;
+}
+
+/*
+ * Use SHA-256 to hash the string in `bytes_in`
+ * with the integer given in `counter`.
+ */
+static int
+hash_once (EVP_MD_CTX *mdctx, uint8_t *bytes_out, 
+    const uint8_t *bytes_in, int inlen, uint16_t counter) 
+{
+  int rv = ERROR;
+  CHECK_C (EVP_DigestInit_ex (mdctx, EVP_sha256 (), NULL));
+  CHECK_C (EVP_DigestUpdate (mdctx, &counter, sizeof counter));
+  CHECK_C (EVP_DigestUpdate (mdctx, bytes_in, inlen));
+  CHECK_C (EVP_DigestFinal_ex (mdctx, bytes_out, NULL));
+
+cleanup:
+  return rv;
+}
+
+/*
+ * Output a string of pseudorandom bytes by hashing a 
+ * counter with the bytestring provided:
+ *    Hash(0|bytes_in) | Hash(1|bytes_in) | ... 
+ */
+static int
+hash_to_bytes (uint8_t *bytes_out, int outlen,
+    const uint8_t *bytes_in, int inlen)
+{
+  int rv = ERROR;
+  uint16_t counter = 0;
+  uint8_t buf[SHA256_DIGEST_LENGTH];
+  EVP_MD_CTX *mdctx = NULL; 
+
+  CHECK_A (mdctx = EVP_MD_CTX_create());
+
+  int bytes_filled = 0;
+  do {
+    const int to_copy = min (SHA256_DIGEST_LENGTH, outlen - bytes_filled);
+    CHECK_C (hash_once (mdctx, buf, bytes_in, inlen, counter));
+    memcpy (bytes_out + bytes_filled, buf, to_copy);
+    
+    counter++;
+    bytes_filled += SHA256_DIGEST_LENGTH;
+  } while (bytes_filled < outlen);
+
+cleanup:
+
+  if (mdctx) EVP_MD_CTX_destroy (mdctx);
+  return rv;
+}
+
+int 
+Params_hash_to_exponent (Params p, BIGNUM *exp, 
+    const uint8_t *str, int strlen)
+{
+  int rv = ERROR;
+
+  int nbytes = BN_num_bytes (p->order);
+  uint8_t bytes_out[nbytes];
+  
+  CHECK_C (hash_to_bytes (bytes_out, nbytes, str, strlen));
+  CHECK_A (BN_bin2bn (bytes_out, SHA256_DIGEST_LENGTH, exp));
+  CHECK_C (BN_mod (exp, exp, p->order, p->ctx));
+
+cleanup:
+  return rv;
 }
 

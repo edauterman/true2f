@@ -36,11 +36,11 @@ void PublicKey_free (PublicKey key);
 SecretKey SecretKey_new (void);
 void SecretKey_free (SecretKey key);
 
-int VRF_keygen (Params params, PublicKey *pk_out, SecretKey *sk_out);
+int VRF_keygen (Params params, PublicKey pk_out, SecretKey sk_out);
 
-int VRF_eval (Params params, const_PublicKey master_pk, 
+int VRF_eval (Params params, const_SecretKey master_sk, 
     const uint8_t *input, int inputlen,
-    PublicKey *output_pk, SecretKey *output_sk, VRFProof *proof);
+    PublicKey output_pk, SecretKey output_sk, VRFProof *proof);
 
 int VRF_verify (Params params,
     const_PublicKey mpk, const uint8_t *input, int inputlen,
