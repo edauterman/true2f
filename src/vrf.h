@@ -20,8 +20,9 @@
 #include <openssl/ec.h>
 #include "params.h"
 
-struct public_key;
-struct secret_key;
+#ifdef __cplusplus
+extern "C"{
+#endif
 
 typedef struct public_key* PublicKey;
 typedef const struct public_key* const_PublicKey;
@@ -40,11 +41,14 @@ int VRF_keygen (Params params, PublicKey pk_out, SecretKey sk_out);
 
 int VRF_eval (Params params, const_SecretKey master_sk, 
     const uint8_t *input, int inputlen,
-    PublicKey output_pk, SecretKey output_sk, VRFProof *proof);
+    PublicKey output_pk, SecretKey output_sk, VRFProof proof);
 
 int VRF_verify (Params params,
     const_PublicKey mpk, const uint8_t *input, int inputlen,
     const_PublicKey output_pk, const_VRFProof proof);
 
+#ifdef __cplusplus
+}
+#endif
 #endif
 

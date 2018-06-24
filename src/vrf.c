@@ -15,7 +15,9 @@
  */
 
 #include <stdlib.h>
+
 #include "common.h"
+#include "ddh.h"
 #include "vrf.h"
 
 struct public_key {
@@ -57,18 +59,18 @@ PublicKey_free (PublicKey pk)
 SecretKey 
 SecretKey_new (void)
 {
+  int rv = ERROR;
   SecretKey sk = NULL;
-  sk = malloc (sizeof *sk);
-  if (!sk)
-    return NULL;
+  CHECK_A (sk = malloc (sizeof *sk));
 
   sk->x = NULL;
-  sk->x = BN_new ();
-  if (!sk->x) {
+  CHECK_A (sk->x = BN_new ());
+
+cleanup:
+  if (rv == ERROR) {
     SecretKey_free (sk);
     return NULL;
   }
-
   return sk;
 }
 
@@ -94,11 +96,13 @@ cleanup:
 int 
 VRF_eval (Params params, const_SecretKey master_sk, 
     const uint8_t *input, int inputlen,
-    PublicKey output_pk, SecretKey output_sk, VRFProof *proof)
+    PublicKey output_pk, SecretKey output_sk, VRFProof proof)
 {
   int rv;
   const BIGNUM *q = Params_order (params);
   BN_CTX *ctx = Params_ctx (params);
+  DDHStatement ddh;
+
   // x = Hash(input)
   CHECK_C (Params_hash_to_exponent (params, output_sk->x, input, inputlen));
 
@@ -111,7 +115,16 @@ VRF_eval (Params params, const_SecretKey master_sk,
   // Compute public key as g^output
   CHECK_C (Params_exp (params, output_pk->gx, output_sk->x));
 
+  // Prove that
+  //    (g, g^H(x).g^{sk}, pk_x, g) is a DDH tuple
+  //
+  proof = NULL;
+
+  
+
 cleanup:
   return ERROR;
 }
+
+
 

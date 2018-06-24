@@ -1,3 +1,6 @@
+#ifndef _DDH_H
+#define _DDH_H
+
 /*
  * Copyright (c) 2018, Henry Corrigan-Gibbs
  * 
@@ -14,28 +17,36 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <gtest/gtest.h> 
+#include <openssl/ec.h>
+#include "params.h"
 
-#include "src/common.h"
-#include "src/vrf.h"
+#ifdef __cplusplus
+extern "C"{
+#endif
 
-TEST(VRF, KeyGen) {
-  int rv = ERROR;
-  Params p = NULL;
-  PublicKey pk = NULL;
-  SecretKey sk = NULL;
- 
-  CHECK_A (p = Params_new (P256));
-  CHECK_A (pk = PublicKey_new (p));
-  CHECK_A (sk = SecretKey_new ());
+typedef struct {
+  EC_POINT *g;    // generator g
+  EC_POINT *gx;   // g^x
+  EC_POINT *h;    // h    = g^y
+  EC_POINT *hx;   // h^x  = g^{xy}
+} DDHStatement;
 
-  CHECK_C (VRF_keygen (p, pk, sk));
+typedef struct ddh_proof *DDHProof;
+typedef const struct ddh_proof *const_DDHProof;
 
-cleanup:
-  if (pk) PublicKey_free (pk);
-  if (sk) SecretKey_free (sk);
-  if (p) Params_free (p);
-  EXPECT_TRUE (rv == OKAY);
+DDHProof DDHProof_new (void);
+void DDHProof_free (DDHProof pf);
+
+// Prove that four-tuple of points passed in is of the form
+//    (g, g^x, g^y, g^{xy}).
+// To prove this, the prover needs to know the secret exponent x.
+int DDHProve (Params p, DDHProof pf, const DDHStatement *st, const BIGNUM *x);
+
+int DDHVerify (Params p, const_DDHProof pf, const DDHStatement *st);
+
+#ifdef __cplusplus
 }
+#endif
 
+#endif
 

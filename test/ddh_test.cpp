@@ -16,26 +16,8 @@
 
 #include <gtest/gtest.h> 
 
-#include "src/common.h"
-#include "src/vrf.h"
-
-TEST(VRF, KeyGen) {
-  int rv = ERROR;
-  Params p = NULL;
-  PublicKey pk = NULL;
-  SecretKey sk = NULL;
- 
-  CHECK_A (p = Params_new (P256));
-  CHECK_A (pk = PublicKey_new (p));
-  CHECK_A (sk = SecretKey_new ());
-
-  CHECK_C (VRF_keygen (p, pk, sk));
-
-cleanup:
-  if (pk) PublicKey_free (pk);
-  if (sk) SecretKey_free (sk);
-  if (p) Params_free (p);
-  EXPECT_TRUE (rv == OKAY);
+TEST(DDH, Prove) {
+    EXPECT_EQ(1, 1);
 }
 
 

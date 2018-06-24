@@ -56,7 +56,7 @@ Params_new (CurveName c)
   if (!nid)
     return NULL;
 
-  p = malloc (sizeof *p);
+  p = (Params) malloc (sizeof *p);
   if (!p)
     return NULL;
 
@@ -134,13 +134,40 @@ Params_rand_point (Params p, EC_POINT *point)
   exp = BN_new ();
 
   CHECK_C ((exp != NULL));
-  CHECK_C (Params_rand_exponent (p, exp));
-
-  rv = Params_exp (p, point, exp);
+  CHECK_C (Params_rand_point_exp (p, point, exp));
 
 cleanup:
   BN_clear_free (exp);
   return rv;
+}
+
+int 
+Params_rand_point_exp (Params p, EC_POINT *point, BIGNUM *x)
+{
+  int rv = ERROR;
+  CHECK_C (Params_rand_exponent (p, x));
+  CHECK_C (Params_exp (p, point, x));
+
+cleanup:
+  return rv;
+}
+
+int 
+Params_exp_base (Params p, EC_POINT *point, 
+    const EC_POINT *base, const BIGNUM *exponent)
+{
+  return EC_POINT_mul (p->group, point, NULL, base, exponent, p->ctx);
+}
+
+int 
+Params_exp_base2 (Params p, EC_POINT *point, 
+    const EC_POINT *base1, const BIGNUM *e1,
+    const EC_POINT *base2, const BIGNUM *e2)
+{
+  const EC_POINT *points[2] = {base1, base2};
+  const BIGNUM *exps[2] = {e1, e2};
+
+  return EC_POINTs_mul(p->group, point, NULL, 2, points, exps , p->ctx);
 }
 
 int 
@@ -154,7 +181,7 @@ Params_rand_exponent (Params p, BIGNUM *x)
 int 
 Params_exp (Params p, EC_POINT *point, const BIGNUM *exp)
 {
-  return EC_POINT_mul (p->group, point, exp, NULL, NULL, p->ctx) ? OKAY : ERROR;
+  return EC_POINT_mul (p->group, point, exp, NULL, NULL, p->ctx); 
 }
 
 /*
@@ -180,7 +207,7 @@ cleanup:
  * counter with the bytestring provided:
  *    Hash(0|bytes_in) | Hash(1|bytes_in) | ... 
  */
-static int
+int
 hash_to_bytes (uint8_t *bytes_out, int outlen,
     const uint8_t *bytes_in, int inlen)
 {
@@ -188,10 +215,10 @@ hash_to_bytes (uint8_t *bytes_out, int outlen,
   uint16_t counter = 0;
   uint8_t buf[SHA256_DIGEST_LENGTH];
   EVP_MD_CTX *mdctx = NULL; 
+  int bytes_filled = 0;
 
   CHECK_A (mdctx = EVP_MD_CTX_create());
 
-  int bytes_filled = 0;
   do {
     const int to_copy = min (SHA256_DIGEST_LENGTH, outlen - bytes_filled);
     CHECK_C (hash_once (mdctx, buf, bytes_in, inlen, counter));

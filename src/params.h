@@ -17,14 +17,13 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <openssl/ec.h>
+
 #ifdef __cplusplus
 extern "C"{
 #endif
 
-#include <openssl/ec.h>
-
 struct params;
-
 typedef struct params* Params;
 
 typedef enum {
@@ -35,18 +34,29 @@ typedef enum {
 
 Params Params_new (CurveName c);
 void Params_free (Params p);
+
 const EC_GROUP *Params_group (Params p);
 const BIGNUM *Params_order (Params p);
+const EC_POINT *Params_gen (Params p);
 BN_CTX *Params_ctx (Params p);
 
 int Params_rand_point (Params p, EC_POINT *point);
 int Params_rand_exponent (Params p, BIGNUM *x);
+int Params_rand_point_exp (Params p, EC_POINT *point, BIGNUM *x);
 
 // Compute g^x where g is the fixed generator
 int Params_exp (Params p, EC_POINT *point, const BIGNUM *exponent);
+// Compute h^x for any point h
+int Params_exp_base (Params p, EC_POINT *point, 
+    const EC_POINT *base, const BIGNUM *exponent);
+int Params_exp_base2 (Params p, EC_POINT *point, 
+    const EC_POINT *base1, const BIGNUM *e1,
+    const EC_POINT *base2, const BIGNUM *e2);
 
 int Params_hash_to_exponent (Params p, BIGNUM *exp, 
     const uint8_t *str, int strlen);
+int hash_to_bytes (uint8_t *bytes_out, int outlen,
+    const uint8_t *bytes_in, int inlen);
 
 #ifdef __cplusplus
 }

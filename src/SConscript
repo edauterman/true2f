@@ -5,6 +5,7 @@ Import('env')
 penv = env.Clone()
 
 src = [
+    "ddh.c",
     "params.c",
     "vrf.c",
 ]

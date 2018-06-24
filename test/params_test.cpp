@@ -15,6 +15,7 @@
  */
 
 #include <gtest/gtest.h> 
+#include "src/common.h"
 #include "src/params.h"
 
 class ParamTest : public ::testing::TestWithParam<CurveName> {
@@ -49,15 +50,97 @@ TEST_P (ParamTest, RandPoint) {
 
   pt = EC_POINT_new (Params_group (p));
 
-  EXPECT_TRUE (OKAY == Params_rand_exponent (p, x));
-  EXPECT_TRUE (OKAY == Params_rand_point (p, pt));
-  BN_free (x);
+  EXPECT_TRUE (Params_rand_exponent (p, x));
+  EXPECT_TRUE (Params_rand_point (p, pt));
 
 cleanup:
   if (x) BN_free (x);
   if (pt) EC_POINT_free (pt);
 }
 
+TEST_P (ParamTest, Exp) {
+  int rv = ERROR;
+  BIGNUM *x = NULL;
+  BIGNUM *y = NULL;
+  EC_POINT *pt = NULL;
+  EC_POINT *pt2 = NULL;
+  const EC_GROUP *grp = Params_group (p);
+  BN_CTX *ctx = Params_ctx (p);
+  
+  CHECK_A (x = BN_new ());
+  CHECK_A (y = BN_new ());
+
+  pt = EC_POINT_new (Params_group (p));
+  pt2 = EC_POINT_new (Params_group (p));
+
+  EXPECT_TRUE (Params_rand_exponent (p, x));
+  EXPECT_TRUE (Params_exp (p, pt, x));
+
+  EXPECT_TRUE (EC_POINT_mul (grp, pt2, x, NULL, NULL, ctx));
+  EXPECT_TRUE (EC_POINT_cmp (grp, pt, pt2, ctx) == 0);
+
+cleanup:
+  if (x) BN_free (x);
+  if (y) BN_free (y);
+  if (pt) EC_POINT_free (pt);
+  if (pt2) EC_POINT_free (pt2);
+  EXPECT_TRUE (rv);
+}
+
+TEST_P (ParamTest, HashToExp) {
+  int rv = ERROR;
+  BIGNUM *x = NULL;
+  BIGNUM *y = NULL;
+  uint8_t str[] = "this is the string";
+
+  CHECK_A (x = BN_new ());
+  CHECK_A (y = BN_new ());
+
+  CHECK_C (Params_hash_to_exponent (p, x, str, sizeof str));
+  CHECK_C (Params_hash_to_exponent (p, y, str, sizeof str));
+  EXPECT_TRUE (BN_cmp (x, y) == 0);
+
+  str[0] = '3';
+  CHECK_C (Params_hash_to_exponent (p, y, str, sizeof str));
+  EXPECT_FALSE (BN_cmp (x, y) == 0);
+
+cleanup:
+  if (x) BN_free (x);
+  if (y) BN_free (y);
+  EXPECT_TRUE (rv);
+}
+
 INSTANTIATE_TEST_CASE_P (Init,
                         ParamTest,
                         ::testing::Values(P256, P384, P521));
+
+class HashTest : public ::testing::TestWithParam<int> {};
+
+TEST_P (HashTest, Basic) {
+  int rv = ERROR;
+  const int inlen = 123;
+  const int outlen = GetParam();
+  uint8_t bytes_out[outlen]; 
+  uint8_t bytes_in[inlen];
+  int zeros = 0;
+
+  for (int i=0; i<inlen; i++) {
+    bytes_in[i] = (uint8_t)i;
+  }
+
+  CHECK_C (hash_to_bytes (bytes_out, outlen, bytes_in, inlen));
+
+  for (int i=0; i<outlen; i++) {
+    if (!bytes_out[i]) zeros++;
+  }
+  
+  EXPECT_LE (zeros, outlen/(64));
+
+cleanup:
+  EXPECT_TRUE (rv);
+}
+
+INSTANTIATE_TEST_CASE_P (Init,
+                        HashTest,
+                        ::testing::Values(0, 1, 15, 16, 17, 31, 32, 33, 255, 256, 257, 10023, 23103));
+
