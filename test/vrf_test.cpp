@@ -22,19 +22,35 @@
 TEST(VRF, KeyGen) {
   int rv = ERROR;
   Params p = NULL;
-  PublicKey pk = NULL;
-  SecretKey sk = NULL;
+  PublicKey mpk = NULL, pk = NULL;
+  SecretKey msk = NULL, sk = NULL;
+  DDHProof pf = NULL;
+  const uint8_t input[] = "www.example.com";
+  const uint8_t input_bad[] = "www.evil.com";
  
   CHECK_A (p = Params_new (P256));
+  CHECK_A (pf = DDHProof_new ());
+  CHECK_A (mpk = PublicKey_new (p));
+  CHECK_A (msk = SecretKey_new ());
   CHECK_A (pk = PublicKey_new (p));
   CHECK_A (sk = SecretKey_new ());
 
-  CHECK_C (VRF_keygen (p, pk, sk));
+  CHECK_C (VRF_keygen (p, mpk, msk));
+  CHECK_C (VRF_eval (p, msk, input, sizeof input, pk, sk, pf));
+  EXPECT_EQ (VRF_verify (p, mpk, input, sizeof input, pk, pf), OKAY);
+  EXPECT_EQ (VRF_verify (p, mpk, input_bad, sizeof input_bad, pk, pf), ERROR);
+  EXPECT_EQ (VRF_verify (p, mpk, input, sizeof(input_bad) - 1, pk, pf), ERROR);
+  EXPECT_EQ (VRF_verify (p, mpk, input, 0, pk, pf), ERROR);
+  EXPECT_EQ (VRF_verify (p, pk, input, sizeof input, pk, pf), ERROR);
+  EXPECT_EQ (VRF_verify (p, mpk, input, sizeof input, mpk, pf), ERROR);
 
 cleanup:
+  if (mpk) PublicKey_free (mpk);
+  if (msk) SecretKey_free (msk);
   if (pk) PublicKey_free (pk);
   if (sk) SecretKey_free (sk);
   if (p) Params_free (p);
+  if (pf) DDHProof_free (pf);
   EXPECT_TRUE (rv == OKAY);
 }
 

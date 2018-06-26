@@ -54,7 +54,7 @@ DDHProof_free (DDHProof pf)
 }
 
 static int
-hash_point (Params p, EVP_MD_CTX *mdctx, const uint8_t *tag, int taglen, const EC_POINT *pt)
+hash_point (const_Params p, EVP_MD_CTX *mdctx, const uint8_t *tag, int taglen, const EC_POINT *pt)
 {
   int rv = ERROR;
   const EC_GROUP *group = Params_group (p);
@@ -75,7 +75,7 @@ cleanup:
 }
 
 static int
-compute_challenge (Params p, BIGNUM *chal,
+compute_challenge (const_Params p, BIGNUM *chal,
     const DDHStatement *st, 
     const EC_POINT *R1, 
     const EC_POINT *R2)
@@ -135,7 +135,7 @@ cleanup:
  *      c == Hash(g, h, X, X', R, R').
  */
 int 
-DDHProve (Params p, DDHProof pf, const DDHStatement *st, const BIGNUM *x)
+DDHProof_prove (const_Params p, DDHProof pf, const DDHStatement *st, const BIGNUM *x)
 {
   int rv = ERROR;
   EC_POINT *R1 = NULL;
@@ -144,10 +144,9 @@ DDHProve (Params p, DDHProof pf, const DDHStatement *st, const BIGNUM *x)
 
   const BIGNUM *order = Params_order (p);
   BN_CTX *ctx = Params_ctx (p);
-  const EC_GROUP *group = Params_group (p);
 
-  CHECK_A (R1 = EC_POINT_new (group));
-  CHECK_A (R2 = EC_POINT_new (group));
+  CHECK_A (R1 = Params_point_new (p));
+  CHECK_A (R2 = Params_point_new (p));
   CHECK_A (r = BN_new ());
 
   // Sample a random r
@@ -178,17 +177,15 @@ cleanup:
 }
 
 int 
-DDHVerify (Params p, const_DDHProof pf, const DDHStatement *st)
+DDHProof_verify (const_Params p, const_DDHProof pf, const DDHStatement *st)
 {
   int rv = ERROR;
   EC_POINT *R1 = NULL;
   EC_POINT *R2 = NULL;
   BIGNUM *c_test = NULL;
 
-  const EC_GROUP *group = Params_group (p);
-
-  CHECK_A (R1 = EC_POINT_new (group));
-  CHECK_A (R2 = EC_POINT_new (group));
+  CHECK_A (R1 = Params_point_new (p));
+  CHECK_A (R2 = Params_point_new (p));
   CHECK_A (c_test = BN_new ());
   
   /*

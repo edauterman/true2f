@@ -95,6 +95,13 @@ Params_new (CurveName c)
   return p;
 }
 
+EC_POINT *
+Params_point_new (const_Params p)
+{
+  return EC_POINT_new (p->group);
+}
+
+
 void 
 Params_free (Params p)
 {
@@ -109,25 +116,31 @@ Params_free (Params p)
 }
 
 const EC_GROUP *
-Params_group (Params p) 
+Params_group (const_Params p) 
 {
   return p->group;
 }
 
+const EC_POINT *
+Params_gen (const_Params p)
+{
+  return EC_GROUP_get0_generator (p->group);
+}
+
 const BIGNUM *
-Params_order (Params p) 
+Params_order (const_Params p) 
 {
   return p->order;
 }
 
 BN_CTX *
-Params_ctx (Params p) 
+Params_ctx (const_Params p) 
 {
   return p->ctx;
 }
 
 int 
-Params_rand_point (Params p, EC_POINT *point)
+Params_rand_point (const_Params p, EC_POINT *point)
 {
   int rv = ERROR;
   BIGNUM *exp = NULL;
@@ -142,7 +155,13 @@ cleanup:
 }
 
 int 
-Params_rand_point_exp (Params p, EC_POINT *point, BIGNUM *x)
+Params_mul (const_Params p, EC_POINT *res, const EC_POINT *g, const EC_POINT *h)
+{
+  return EC_POINT_add (p->group, res, g, h, p->ctx); 
+}
+
+int 
+Params_rand_point_exp (const_Params p, EC_POINT *point, BIGNUM *x)
 {
   int rv = ERROR;
   CHECK_C (Params_rand_exponent (p, x));
@@ -153,14 +172,14 @@ cleanup:
 }
 
 int 
-Params_exp_base (Params p, EC_POINT *point, 
+Params_exp_base (const_Params p, EC_POINT *point, 
     const EC_POINT *base, const BIGNUM *exponent)
 {
   return EC_POINT_mul (p->group, point, NULL, base, exponent, p->ctx);
 }
 
 int 
-Params_exp_base2 (Params p, EC_POINT *point, 
+Params_exp_base2 (const_Params p, EC_POINT *point, 
     const EC_POINT *base1, const BIGNUM *e1,
     const EC_POINT *base2, const BIGNUM *e2)
 {
@@ -171,7 +190,7 @@ Params_exp_base2 (Params p, EC_POINT *point,
 }
 
 int 
-Params_rand_exponent (Params p, BIGNUM *x)
+Params_rand_exponent (const_Params p, BIGNUM *x)
 {
   // TODO: Generate a uniform number in the range [0, q).
   int bits = BN_num_bits (p->order);
@@ -179,7 +198,7 @@ Params_rand_exponent (Params p, BIGNUM *x)
 }
 
 int 
-Params_exp (Params p, EC_POINT *point, const BIGNUM *exp)
+Params_exp (const_Params p, EC_POINT *point, const BIGNUM *exp)
 {
   return EC_POINT_mul (p->group, point, exp, NULL, NULL, p->ctx); 
 }
@@ -235,7 +254,7 @@ cleanup:
 }
 
 int 
-Params_hash_to_exponent (Params p, BIGNUM *exp, 
+Params_hash_to_exponent (const_Params p, BIGNUM *exp, 
     const uint8_t *str, int strlen)
 {
   int rv = ERROR;

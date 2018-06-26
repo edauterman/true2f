@@ -25,10 +25,10 @@ extern "C"{
 #endif
 
 typedef struct {
-  EC_POINT *g;    // generator g
-  EC_POINT *gx;   // g^x
-  EC_POINT *h;    // h    = g^y
-  EC_POINT *hx;   // h^x  = g^{xy}
+  const EC_POINT *g;    // generator g
+  const EC_POINT *gx;   // g^x
+  const EC_POINT *h;    // h    = g^y
+  const EC_POINT *hx;   // h^x  = g^{xy}
 } DDHStatement;
 
 typedef struct ddh_proof *DDHProof;
@@ -40,9 +40,9 @@ void DDHProof_free (DDHProof pf);
 // Prove that four-tuple of points passed in is of the form
 //    (g, g^x, g^y, g^{xy}).
 // To prove this, the prover needs to know the secret exponent x.
-int DDHProve (Params p, DDHProof pf, const DDHStatement *st, const BIGNUM *x);
+int DDHProof_prove (const_Params p, DDHProof pf, const DDHStatement *st, const BIGNUM *x);
 
-int DDHVerify (Params p, const_DDHProof pf, const DDHStatement *st);
+int DDHProof_verify (const_Params p, const_DDHProof pf, const DDHStatement *st);
 
 #ifdef __cplusplus
 }

@@ -19,6 +19,7 @@
 
 #include <openssl/ec.h>
 #include "params.h"
+#include "ddh.h"
 
 #ifdef __cplusplus
 extern "C"{
@@ -28,24 +29,22 @@ typedef struct public_key* PublicKey;
 typedef const struct public_key* const_PublicKey;
 typedef struct secret_key* SecretKey;
 typedef const struct secret_key* const_SecretKey;
-typedef struct vrf_proof* VRFProof;
-typedef const struct vrf_proof* const_VRFProof;
 
-PublicKey PublicKey_new (Params params);
+PublicKey PublicKey_new (const_Params params);
 void PublicKey_free (PublicKey key);
 
 SecretKey SecretKey_new (void);
 void SecretKey_free (SecretKey key);
 
-int VRF_keygen (Params params, PublicKey pk_out, SecretKey sk_out);
+int VRF_keygen (const_Params params, PublicKey pk_out, SecretKey sk_out);
 
-int VRF_eval (Params params, const_SecretKey master_sk, 
+int VRF_eval (const_Params params, const_SecretKey master_sk, 
     const uint8_t *input, int inputlen,
-    PublicKey output_pk, SecretKey output_sk, VRFProof proof);
+    PublicKey output_pk, SecretKey output_sk, DDHProof proof);
 
-int VRF_verify (Params params,
+int VRF_verify (const_Params params,
     const_PublicKey mpk, const uint8_t *input, int inputlen,
-    const_PublicKey output_pk, const_VRFProof proof);
+    const_PublicKey output_pk, const_DDHProof proof);
 
 #ifdef __cplusplus
 }
