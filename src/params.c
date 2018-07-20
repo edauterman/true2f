@@ -30,6 +30,7 @@
 struct params {
   EC_GROUP *group;
   BIGNUM *order;
+  BIGNUM *base_prime;
   BN_CTX *ctx;
 };
 
@@ -50,6 +51,7 @@ curve_name_to_nid (CurveName c)
 Params 
 Params_new (CurveName c)
 {
+  int rv = 1;
   Params p = NULL;
 
   int nid = curve_name_to_nid (c);
@@ -62,35 +64,26 @@ Params_new (CurveName c)
 
   p->group = NULL;
   p->order = NULL;
+  p->base_prime = NULL;
   p->ctx = NULL;
-  p->group = EC_GROUP_new_by_curve_name (nid);
-  if (!p->group) {
-    Params_free (p);
-    return NULL;
-  }
 
-  p->order = BN_new();
-  if (!p->group) {
-    Params_free (p);
-    return NULL;
-  }
+  CHECK_A (p->ctx = BN_CTX_new ());
+  CHECK_A (p->group = EC_GROUP_new_by_curve_name (nid));
 
-  if (!EC_GROUP_get_order (p->group, p->order, NULL)) {
-    Params_free (p);
-    return NULL;
-  }
+  CHECK_A (p->order = BN_new());
+  CHECK_C (EC_GROUP_get_order (p->group, p->order, NULL));
 
-  if (!(p->ctx = BN_CTX_new ())) {
-    Params_free (p);
-    return NULL;
-  }
+  CHECK_A (p->base_prime = BN_new());
+  CHECK_C (EC_GROUP_get_curve_GFp (p->group, p->base_prime, NULL, NULL, p->ctx));
 
   // Precompute powers of g for faster multiplication
-  if (!EC_GROUP_precompute_mult (p->group, p->ctx)) {
+  CHECK_C (EC_GROUP_precompute_mult (p->group, p->ctx));
+
+cleanup:
+  if (rv != OKAY) {
     Params_free (p);
     return NULL;
   }
-
 
   return p;
 }
@@ -109,6 +102,8 @@ Params_free (Params p)
     EC_GROUP_clear_free (p->group);
   if (p->order) 
     BN_free (p->order);
+  if (p->base_prime) 
+    BN_free (p->base_prime);
   if (p->ctx) 
     BN_CTX_free (p->ctx);
 
@@ -253,13 +248,13 @@ cleanup:
   return rv;
 }
 
-int 
-Params_hash_to_exponent (const_Params p, BIGNUM *exp, 
-    const uint8_t *str, int strlen)
+static int 
+hash_to_int_max (const_Params p, BIGNUM *exp, 
+    const BIGNUM *max, const uint8_t *str, int strlen)
 {
   int rv = ERROR;
 
-  int nbytes = BN_num_bytes (p->order);
+  int nbytes = BN_num_bytes (max);
   uint8_t bytes_out[nbytes];
   
   CHECK_C (hash_to_bytes (bytes_out, nbytes, str, strlen));
@@ -267,6 +262,48 @@ Params_hash_to_exponent (const_Params p, BIGNUM *exp,
   CHECK_C (BN_mod (exp, exp, p->order, p->ctx));
 
 cleanup:
+  return rv;
+}
+
+int 
+Params_hash_to_exponent (const_Params p, BIGNUM *exp, 
+    const uint8_t *str, int strlen)
+{
+  return hash_to_int_max (p, exp, p->order, str, strlen);
+}
+
+int 
+Params_hash_to_point (const_Params p, EC_POINT *point, 
+    const uint8_t *str, int strlen)
+{
+  int rv = ERROR;
+  BIGNUM *x = NULL;
+  CHECK_A (point);    // point should already be allocated with EC_POINT_new()
+  CHECK_A (x = BN_new());
+
+  // Hash string into an x coordinate
+  CHECK_C (hash_to_int_max (p, x, p->base_prime, str, strlen));
+
+  // TODO: To be completely correct, we should also derive the y_bit 
+  // from the hash of the input string.
+  int y_bit = 0;
+  while (true) {
+
+    // This will fail if there is not solution to the curve equation
+    // with this x.
+    if (EC_POINT_set_compressed_coordinates_GFp(p->group, point, x, y_bit, p->ctx))
+      break;
+
+    // If we fail to hash successfully, try again.
+    //   - Increment x coordinate.
+    //   - Flip the y bit.
+    CHECK_C (BN_add_word (x, 1));
+    CHECK_C (BN_mod (x, x, p->base_prime, p->ctx));
+    y_bit = (y_bit + 1) % 2;
+  }
+
+cleanup:
+  if (x) BN_clear_free (x);
   return rv;
 }
 

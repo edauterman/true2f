@@ -59,6 +59,8 @@ int Params_exp_base2 (const_Params p, EC_POINT *point,
 
 int Params_hash_to_exponent (const_Params p, BIGNUM *exp, 
     const uint8_t *str, int strlen);
+int Params_hash_to_point (const_Params p, EC_POINT *point, 
+    const uint8_t *str, int strlen);
 int hash_to_bytes (uint8_t *bytes_out, int outlen,
     const uint8_t *bytes_in, int inlen);
 

@@ -110,6 +110,35 @@ cleanup:
   EXPECT_TRUE (rv);
 }
 
+TEST_P (ParamTest, HashToPoint) {
+  int rv = ERROR;
+  EC_POINT *x = NULL;
+  EC_POINT *y = NULL;
+  const EC_GROUP *grp = Params_group (p);
+  BN_CTX *ctx = Params_ctx (p);
+  uint8_t str[] = "this is the string";
+
+  CHECK_A (x = Params_point_new (p));
+  CHECK_A (y = Params_point_new (p));
+
+  CHECK_C (Params_hash_to_point (p, x, str, sizeof str));
+  CHECK_C (Params_hash_to_point (p, y, str, sizeof str));
+  EXPECT_TRUE (EC_POINT_cmp (grp, x, y, ctx) == 0);
+
+  str[0] = '3';
+  CHECK_C (Params_hash_to_point (p, y, str, sizeof str));
+  EXPECT_FALSE (EC_POINT_cmp (grp, x, y, ctx) == 0);
+
+  str[7] = '2';
+  CHECK_C (Params_hash_to_point (p, y, str, sizeof str));
+  EXPECT_FALSE (EC_POINT_cmp (grp, x, y, ctx) == 0);
+
+cleanup:
+  if (x) EC_POINT_free (x);
+  if (y) EC_POINT_free (y);
+  EXPECT_TRUE (rv);
+}
+
 INSTANTIATE_TEST_CASE_P (Init,
                         ParamTest,
                         ::testing::Values(P256, P384, P521));
