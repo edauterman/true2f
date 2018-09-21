@@ -1,8 +1,5 @@
-#ifndef _DDH_H
-#define _DDH_H
-
 /*
- * Copyright (c) 2018, Henry Corrigan-Gibbs
+ * Copyright (c) 2018, Google Inc.
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,42 +13,38 @@
  * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+#ifndef _VIF_H
+#define _VIF_H
 
 #include <openssl/ec.h>
 #include "params.h"
+#include "vrf.h"
 
 #ifdef __cplusplus
 extern "C"{
 #endif
 
-typedef struct {
-  const EC_POINT *g;    // generator g
-  const EC_POINT *gx;   // g^x
-  const EC_POINT *h;    // h    = g^y
-  const EC_POINT *hx;   // h^x  = g^{xy}
-} DDHStatement;
-
-struct ddh_proof {
-  BIGNUM *c;  // Challenge
-  BIGNUM *v;  // Verifier's response
+struct vif_proof {
+  BIGNUM *val;
+  VRFProof vrf_proof;
 };
 
-typedef struct ddh_proof *DDHProof;
-typedef const struct ddh_proof *const_DDHProof;
+typedef struct vif_proof *VIFProof;
+typedef const struct vif_proof *const_VIFProof;
 
-DDHProof DDHProof_new (void);
-void DDHProof_free (DDHProof pf);
+VIFProof VIFProof_new(const_Params params);
+void VIFProof_free(VIFProof proof);
 
-// Prove that four-tuple of points passed in is of the form
-//    (g, g^x, g^y, g^{xy}).
-// To prove this, the prover needs to know the secret exponent x.
-int DDHProof_prove (const_Params p, DDHProof pf, const DDHStatement *st, const BIGNUM *x);
+int VIF_eval (const_Params params, const BIGNUM *msk, const BIGNUM *sk_vrf,
+    const uint8_t *input, int inputlen, BIGNUM *sk_out,
+    EC_POINT *pk_out, VIFProof proof_out);
 
-int DDHProof_verify (const_Params p, const_DDHProof pf, const DDHStatement *st);
+int VIF_verify (const_Params params,
+    const EC_POINT *mpk, const EC_POINT *pk_vrf, const uint8_t *input, int inputlen,
+    const EC_POINT *pk, const_VIFProof proof);
 
 #ifdef __cplusplus
 }
 #endif
-
 #endif
 

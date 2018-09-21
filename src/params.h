@@ -41,6 +41,8 @@ EC_POINT *Params_point_new (const_Params p);
 const BIGNUM *Params_order (const_Params p);
 const EC_POINT *Params_gen (const_Params p);
 BN_CTX *Params_ctx (const_Params p);
+const EC_POINT *Params_g (const_Params p);
+const EC_POINT *Params_h (const_Params p);
 
 int Params_rand_point (const_Params p, EC_POINT *point);
 int Params_rand_exponent (const_Params p, BIGNUM *x);
@@ -48,6 +50,8 @@ int Params_rand_point_exp (const_Params p, EC_POINT *point, BIGNUM *x);
 
 // Compute g.h 
 int Params_mul (const_Params p, EC_POINT *res, const EC_POINT *g, const EC_POINT *h);
+// Compute g/h
+int Params_div (const_Params p, EC_POINT *res, const EC_POINT *g, const EC_POINT *h);
 // Compute g^x where g is the fixed generator
 int Params_exp (const_Params p, EC_POINT *point, const BIGNUM *exponent);
 // Compute h^x for any point h
@@ -56,13 +60,23 @@ int Params_exp_base (const_Params p, EC_POINT *point,
 int Params_exp_base2 (const_Params p, EC_POINT *point, 
     const EC_POINT *base1, const BIGNUM *e1,
     const EC_POINT *base2, const BIGNUM *e2);
+int Params_exp_base_g (const_Params p, EC_POINT *point,
+    const BIGNUM *exp);
+int Params_exp_base_h (const_Params p, EC_POINT *point,
+    const BIGNUM *exp);
+
+int Params_point_to_exponent (const_Params p, BIGNUM *exp,
+                              const EC_POINT *point);
 
 int Params_hash_to_exponent (const_Params p, BIGNUM *exp, 
     const uint8_t *str, int strlen);
-int Params_hash_to_point (const_Params p, EC_POINT *point, 
-    const uint8_t *str, int strlen);
 int hash_to_bytes (uint8_t *bytes_out, int outlen,
     const uint8_t *bytes_in, int inlen);
+int Params_hash_point(const_Params p, EVP_MD_CTX *mdctx, const uint8_t *tag,
+               int taglen, const EC_POINT *pt);
+int Params_hash_to_point (const_Params p, EC_POINT *point,
+    const uint8_t *str, int strlen);
+
 
 #ifdef __cplusplus
 }

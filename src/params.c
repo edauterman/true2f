@@ -21,17 +21,20 @@
 
 #include "common.h"
 #include "params.h"
-#include "vrf.h"
 
 #define NID_P256 714
 #define NID_P384 715
 #define NID_P521 716
+#define NID_X9_62_prime256v1 415
 
 struct params {
   EC_GROUP *group;
   BIGNUM *order;
   BIGNUM *base_prime;
   BN_CTX *ctx;
+
+  EC_POINT *g;
+  EC_POINT *h;
 };
 
 static int
@@ -39,7 +42,7 @@ curve_name_to_nid (CurveName c)
 {
   switch (c) {
     case P256:
-      return NID_P256;
+      return NID_X9_62_prime256v1;
     case P384:
       return NID_P384;
     case P521:
@@ -51,7 +54,7 @@ curve_name_to_nid (CurveName c)
 Params 
 Params_new (CurveName c)
 {
-  int rv = 1;
+  int rv = ERROR; 
   Params p = NULL;
 
   int nid = curve_name_to_nid (c);
@@ -78,10 +81,33 @@ Params_new (CurveName c)
 
   // Precompute powers of g for faster multiplication
   CHECK_C (EC_GROUP_precompute_mult (p->group, p->ctx));
+  const EC_POINT *gen = EC_GROUP_get0_generator(p->group);
+  if (!gen) {
+    Params_free (p);
+    return NULL;
+  }
+
+  CHECK_A (p->g = EC_POINT_dup(gen, p->group));
+  CHECK_A (p->h = EC_POINT_new(p->group));
+
+  // Pick some random constant point for h value.
+  BIGNUM *tmp = BN_new();
+  if (!tmp) {
+    Params_free (p);
+    return NULL;
+  }
+  BN_one(tmp);
+  BN_add_word(tmp, 5);
+
+  do {
+    BN_add_word(tmp, 1);
+  } while (!(EC_POINT_set_compressed_coordinates_GFp(p->group, p->h, tmp, 1, p->ctx) &&
+             EC_POINT_is_on_curve(p->group, p->h, p->ctx)));
+  BN_clear_free(tmp);
 
 cleanup:
   if (rv != OKAY) {
-    Params_free (p);
+    Params_free(p);
     return NULL;
   }
 
@@ -102,8 +128,6 @@ Params_free (Params p)
     EC_GROUP_clear_free (p->group);
   if (p->order) 
     BN_free (p->order);
-  if (p->base_prime) 
-    BN_free (p->base_prime);
   if (p->ctx) 
     BN_CTX_free (p->ctx);
 
@@ -134,7 +158,19 @@ Params_ctx (const_Params p)
   return p->ctx;
 }
 
-int 
+const EC_POINT *
+Params_g (const_Params p)
+{
+  return p->g;
+}
+
+const EC_POINT *
+Params_h (const_Params p)
+{
+  return p->h;
+}
+
+int
 Params_rand_point (const_Params p, EC_POINT *point)
 {
   int rv = ERROR;
@@ -153,6 +189,30 @@ int
 Params_mul (const_Params p, EC_POINT *res, const EC_POINT *g, const EC_POINT *h)
 {
   return EC_POINT_add (p->group, res, g, h, p->ctx); 
+}
+
+// g/h
+int
+Params_div (const_Params p, EC_POINT *res, const EC_POINT *g, const EC_POINT *h)
+{
+  int rv = ERROR;
+  BIGNUM *t1 = NULL;
+  EC_POINT *t2 = NULL;
+
+  CHECK_A (t1 = BN_new());
+  CHECK_A (t2 = Params_point_new(p));
+
+  CHECK_C (BN_zero(t1));
+  CHECK_C (BN_sub_word(t1, 1));
+  // t2 = h^-1
+  CHECK_C (Params_exp_base(p, t2, h, t1));
+  // res = g / h
+  CHECK_C (Params_mul(p, res, g, t2));
+
+cleanup:
+  if (t1) BN_clear_free(t1);
+  if (t2) EC_POINT_clear_free(t2);
+  return rv;
 }
 
 int 
@@ -182,6 +242,18 @@ Params_exp_base2 (const_Params p, EC_POINT *point,
   const BIGNUM *exps[2] = {e1, e2};
 
   return EC_POINTs_mul(p->group, point, NULL, 2, points, exps , p->ctx);
+}
+
+int
+Params_exp_base_g (const_Params p, EC_POINT *point,
+    const BIGNUM *exp) {
+  return EC_POINT_mul (p->group, point, NULL, p->g, exp, p->ctx);
+}
+
+int
+Params_exp_base_h (const_Params p, EC_POINT *point,
+    const BIGNUM *exp) {
+  return EC_POINT_mul (p->group, point, NULL, p->h, exp, p->ctx);
 }
 
 int 
@@ -215,6 +287,19 @@ hash_once (EVP_MD_CTX *mdctx, uint8_t *bytes_out,
 cleanup:
   return rv;
 }
+
+int Params_point_to_exponent (const_Params p, BIGNUM *exp,
+                              const EC_POINT *point)
+{
+  int rv = ERROR;
+  unsigned char buf[33];
+  EC_POINT_point2oct(p->group, point, POINT_CONVERSION_COMPRESSED, buf, 33, p->ctx);
+  CHECK_C (Params_hash_to_exponent(p, exp, buf, 33));
+
+cleanup:
+  return rv;
+}
+
 
 /*
  * Output a string of pseudorandom bytes by hashing a 
@@ -256,7 +341,7 @@ hash_to_int_max (const_Params p, BIGNUM *exp,
 
   int nbytes = BN_num_bytes (max);
   uint8_t bytes_out[nbytes];
-  
+
   CHECK_C (hash_to_bytes (bytes_out, nbytes, str, strlen));
   CHECK_A (BN_bin2bn (bytes_out, SHA256_DIGEST_LENGTH, exp));
   CHECK_C (BN_mod (exp, exp, p->order, p->ctx));
@@ -265,13 +350,36 @@ cleanup:
   return rv;
 }
 
-int 
-Params_hash_to_exponent (const_Params p, BIGNUM *exp, 
-    const uint8_t *str, int strlen)
+int Params_hash_to_exponent(const_Params p, BIGNUM *exp,
+                            const uint8_t *str, int strlen)
 {
-  return hash_to_int_max (p, exp, p->order, str, strlen);
+  return hash_to_int_max(p, exp, p->order, str, strlen);
 }
 
+/* Hash EC point, prefixed with tag. */
+int
+Params_hash_point (const_Params p, EVP_MD_CTX *mdctx, const uint8_t *tag, int taglen,
+            const EC_POINT *pt)
+{
+  int rv = ERROR;
+  const EC_GROUP *group = Params_group (p);
+  BN_CTX *ctx = Params_ctx (p);
+
+  const size_t nlen = EC_POINT_point2oct (group, pt,
+        POINT_CONVERSION_COMPRESSED, NULL, 0, ctx);
+  uint8_t buf[nlen];
+  const size_t wrote = EC_POINT_point2oct (group, pt,
+        POINT_CONVERSION_COMPRESSED, buf, nlen, ctx);
+
+  CHECK_C (EVP_DigestUpdate (mdctx, &taglen, sizeof taglen));
+  CHECK_C (EVP_DigestUpdate (mdctx, tag, taglen));
+  CHECK_C (EVP_DigestUpdate (mdctx, buf, wrote));
+
+cleanup:
+  return rv;
+}
+
+/* Hash to EC point. */
 int 
 Params_hash_to_point (const_Params p, EC_POINT *point, 
     const uint8_t *str, int strlen)
@@ -288,7 +396,6 @@ Params_hash_to_point (const_Params p, EC_POINT *point,
   // from the hash of the input string.
   int y_bit = 0;
   while (true) {
-
     // This will fail if there is not solution to the curve equation
     // with this x.
     if (EC_POINT_set_compressed_coordinates_GFp(p->group, point, x, y_bit, p->ctx))

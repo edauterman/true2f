@@ -18,11 +18,7 @@
 
 #include "common.h"
 #include "ddh.h"
-
-struct ddh_proof {
-  BIGNUM *c;  // Challenge
-  BIGNUM *v;  // Verifier's response
-};
+#include "params.h"
 
 DDHProof 
 DDHProof_new (void)
@@ -54,27 +50,6 @@ DDHProof_free (DDHProof pf)
 }
 
 static int
-hash_point (const_Params p, EVP_MD_CTX *mdctx, const uint8_t *tag, int taglen, const EC_POINT *pt)
-{
-  int rv = ERROR;
-  const EC_GROUP *group = Params_group (p);
-  BN_CTX *ctx = Params_ctx (p);
-
-  const size_t nlen = EC_POINT_point2oct (group, pt,
-        POINT_CONVERSION_COMPRESSED, NULL, 0, ctx);
-  uint8_t buf[nlen];
-  const size_t wrote = EC_POINT_point2oct (group, pt,
-        POINT_CONVERSION_COMPRESSED, buf, nlen, ctx);
-
-  CHECK_C (EVP_DigestUpdate (mdctx, &taglen, sizeof taglen));
-  CHECK_C (EVP_DigestUpdate (mdctx, tag, taglen));
-  CHECK_C (EVP_DigestUpdate (mdctx, buf, wrote));
-
-cleanup:
-  return rv;
-}
-
-static int
 compute_challenge (const_Params p, BIGNUM *chal,
     const DDHStatement *st, 
     const EC_POINT *R1, 
@@ -93,12 +68,12 @@ compute_challenge (const_Params p, BIGNUM *chal,
 
   CHECK_A (mdctx = EVP_MD_CTX_create());
   CHECK_C (EVP_DigestInit_ex (mdctx, EVP_sha256 (), NULL));
-  CHECK_C (hash_point (p, mdctx, tag_g, sizeof tag_g, st->g));
-  CHECK_C (hash_point (p, mdctx, tag_gx, sizeof tag_gx, st->gx));
-  CHECK_C (hash_point (p, mdctx, tag_h, sizeof tag_h, st->h));
-  CHECK_C (hash_point (p, mdctx, tag_hx, sizeof tag_hx, st->hx));
-  CHECK_C (hash_point (p, mdctx, tag_r1, sizeof tag_r1, R1));
-  CHECK_C (hash_point (p, mdctx, tag_r2, sizeof tag_r2, R2));
+  CHECK_C (Params_hash_point (p, mdctx, tag_g, sizeof tag_g, st->g));
+  CHECK_C (Params_hash_point (p, mdctx, tag_gx, sizeof tag_gx, st->gx));
+  CHECK_C (Params_hash_point (p, mdctx, tag_h, sizeof tag_h, st->h));
+  CHECK_C (Params_hash_point (p, mdctx, tag_hx, sizeof tag_hx, st->hx));
+  CHECK_C (Params_hash_point (p, mdctx, tag_r1, sizeof tag_r1, R1));
+  CHECK_C (Params_hash_point (p, mdctx, tag_r2, sizeof tag_r2, R2));
   CHECK_C (EVP_DigestFinal_ex (mdctx, buf, NULL));
 
   // The challenge should never need to be more than 256 bits.

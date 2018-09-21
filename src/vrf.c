@@ -20,156 +20,117 @@
 #include "ddh.h"
 #include "vrf.h"
 
-struct public_key {
-  EC_POINT *gx;
-};
-
-struct secret_key {
-  BIGNUM *x;
-};
-
-
-PublicKey 
-PublicKey_new (const_Params params)
+VRFProof
+VRFProof_new(const_Params params)
 {
   int rv = ERROR;
-  PublicKey pk = NULL;
-  pk = malloc (sizeof *pk);
-  if (!pk)
-    return NULL;
+  VRFProof proof = NULL;
+  CHECK_A (proof = malloc(sizeof *proof));
 
-  pk->gx = NULL;
-  CHECK_A (pk->gx = Params_point_new (params));
+  proof->val_pt = NULL;
+  proof->ddh_proof = NULL;
+  CHECK_A (proof->val_pt = Params_point_new(params));
+  CHECK_A (proof->ddh_proof = DDHProof_new());
 
 cleanup:
   if (rv == ERROR) {
-    PublicKey_free (pk);
+    VRFProof_free(proof);
     return NULL;
   }
-  return pk;
+  return proof;
 }
 
-void 
-PublicKey_free (PublicKey pk)
+void
+VRFProof_free(VRFProof proof)
 {
-  if (pk->gx)
-    EC_POINT_clear_free (pk->gx);
-  free (pk);
+  if (proof->val_pt) EC_POINT_clear_free(proof->val_pt);
+  if (proof->ddh_proof) DDHProof_free(proof->ddh_proof);
+  free(proof);
 }
 
-
-SecretKey 
-SecretKey_new (void)
-{
-  int rv = ERROR;
-  SecretKey sk = NULL;
-  CHECK_A (sk = malloc (sizeof *sk));
-
-  sk->x = NULL;
-  CHECK_A (sk->x = BN_new ());
-
-cleanup:
-  if (rv == ERROR) {
-    SecretKey_free (sk);
-    return NULL;
-  }
-  return sk;
-}
-
-void 
-SecretKey_free (SecretKey sk)
-{
-  if (sk->x)
-    BN_clear_free (sk->x);    
-  free (sk);
-}
-
-int 
-VRF_keygen (const_Params p, PublicKey pk_out, SecretKey sk_out)
+int
+VRF_keygen (const_Params p, EC_POINT *pk_out, BIGNUM *sk_out)
 {
   int rv = ERROR;
-  CHECK_C (Params_rand_exponent (p, sk_out->x));
-  CHECK_C (Params_exp (p, pk_out->gx, sk_out->x));
+  CHECK_C (Params_rand_exponent (p, sk_out));
+  CHECK_C (Params_exp (p, pk_out, sk_out));
 
 cleanup:
-  return rv; 
+  return rv;
 }
 
-int 
-VRF_eval (const_Params params, const_SecretKey master_sk, 
+int
+VRF_eval (const_Params params, const BIGNUM *sk,
     const uint8_t *input, int inputlen,
-    PublicKey output_pk, SecretKey output_sk, DDHProof proof)
+    BIGNUM *val_out, VRFProof proof_out)
 {
   int rv;
-  const BIGNUM *q = Params_order (params);
-  BN_CTX *ctx = Params_ctx (params);
-  EC_POINT *ddh_gx = NULL;
-  CHECK_A (ddh_gx = Params_point_new (params));
+  EC_POINT *hash_input = NULL;
+  EC_POINT *pk = NULL;
 
-  // x = Hash(input)
-  CHECK_C (Params_hash_to_exponent (params, output_sk->x, input, inputlen));
+  CHECK_A (hash_input = Params_point_new(params));
+  CHECK_A (pk = Params_point_new(params));
 
-  // x + sk  mod q
-  CHECK_C (BN_mod_add (output_sk->x, output_sk->x, master_sk->x, q, ctx)); 
+  // Compute Hash(input)
+  CHECK_C (Params_hash_to_point (params, hash_input, input, inputlen));
 
-  // Store g^{x + msk} in ddh_gx
-  CHECK_C (Params_exp (params, ddh_gx, output_sk->x));
+  // Compute Hash(input)^sk
+  CHECK_C (Params_exp_base (params, proof_out->val_pt, hash_input, sk));
 
-  // output = 1/(x + msk)  mod q
-  CHECK_A (BN_mod_inverse (output_sk->x, output_sk->x, q, ctx)); 
+  // Get val by converting point to exponent.
+  CHECK_C (Params_point_to_exponent(params, val_out, proof_out->val_pt));
 
-  // Compute public key as g^output
-  CHECK_C (Params_exp (params, output_pk->gx, output_sk->x));
+  // pk = g^sk
+  CHECK_C (Params_exp(params, pk, sk));
 
   // Prove that
-  //    (g, pk_input, g^H(input).g^{msk}, g) is a DDH tuple
-  DDHStatement st; 
-  st.g = Params_gen (params);
-  st.gx = output_pk->gx;
-  st.h = ddh_gx;
-  st.hx = Params_gen (params);
+  //    (g, g^sk, Hash(input), Hash(input)^sk) is a DDH tuple
+  DDHStatement st;
+  st.g = Params_gen (params);                 // g
+  st.gx = pk;                                 // g^sk
+  st.h = hash_input;  // Hash(input)
+  st.hx = proof_out->val_pt;    // Hash(input)^sk
 
-  CHECK_C (DDHProof_prove (params, proof, &st, output_sk->x));
+  CHECK_C (DDHProof_prove (params, proof_out->ddh_proof, &st, sk));
 
 cleanup:
-  if (ddh_gx) EC_POINT_clear_free (ddh_gx);
+  if (hash_input) EC_POINT_clear_free(hash_input);
+  if (pk) EC_POINT_clear_free(pk);
   return rv;
 }
 
-int 
+int
 VRF_verify (const_Params params,
-    const_PublicKey mpk, const uint8_t *input, int inputlen,
-    const_PublicKey output_pk, const_DDHProof proof)
+    const EC_POINT *pk, const uint8_t *input, int inputlen,
+    const BIGNUM *val, const_VRFProof proof)
 {
   int rv;
-  BIGNUM *x = NULL;
-  EC_POINT *ddh_gx = NULL;
+  EC_POINT *hash_input = NULL;
+  BIGNUM *calc_val = NULL;
 
-  CHECK_A (x = BN_new());
-  CHECK_A (ddh_gx = Params_point_new (params));
+  CHECK_A (hash_input = Params_point_new(params));
+  CHECK_A (calc_val = BN_new());
 
-  // x = Hash(input)
-  CHECK_C (Params_hash_to_exponent (params, x, input, inputlen));
-
-  // Compute g^H(input).g^{msk}
-  CHECK_C (Params_exp (params, ddh_gx, x));
-  CHECK_C (Params_mul (params, ddh_gx, ddh_gx, mpk->gx));
+  // Hash(input)
+  CHECK_C (Params_hash_to_point (params, hash_input, input, inputlen));
 
   // Check that
-  //    (g, pk_input, g^H(input).g^{msk}, g) is a DDH tuple
-  DDHStatement st; 
-  st.g = Params_gen (params);
-  st.gx = output_pk->gx;
-  st.h = ddh_gx;
-  st.hx = Params_gen (params);
+  //    (g, g^sk, Hash(input), Hash(input)^sk) is a DDH tuple
+  DDHStatement st;
+  st.g = Params_gen (params);     // g
+  st.gx = pk;                     // g^sk
+  st.h = hash_input;              // Hash(input)
+  st.hx = proof->val_pt;          // Hash(input)^sk
 
-  CHECK_C (DDHProof_verify (params, proof, &st));
+  // Verify DDH proof.
+  CHECK_C (DDHProof_verify (params, proof->ddh_proof, &st));
+
+  // Check that proof->val_pt corresponds to val.
+  CHECK_C (Params_point_to_exponent(params, calc_val, proof->val_pt));
+  CHECK_C (!BN_cmp(calc_val, val));
 
 cleanup:
-  if (x) BN_clear_free (x);
-  if (ddh_gx) EC_POINT_clear_free (ddh_gx);
+  if (hash_input) EC_POINT_clear_free(hash_input);
+  if (calc_val) BN_clear_free(calc_val);
   return rv;
 }
-
-
-

@@ -5,8 +5,14 @@ Import('env')
 penv = env.Clone()
 
 src = [
+    "agent.cpp",
     "ddh.c",
+    "device.c",
+    "keygen.c",
     "params.c",
+    "pedersen_proof.c",
+    "sanitizable_ecdsa.c",
+    "vif.c",
     "vrf.c",
 ]
 

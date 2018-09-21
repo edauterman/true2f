@@ -87,6 +87,35 @@ cleanup:
   EXPECT_TRUE (rv);
 }
 
+TEST_P (ParamTest, PointToExp) {
+  int rv = ERROR;
+  EC_POINT *pt = NULL;
+  EC_POINT *pt2 = NULL;
+  BIGNUM *x = NULL;
+  BIGNUM *y = NULL;
+
+  CHECK_A (pt = EC_POINT_new (Params_group(p)));
+  CHECK_A (pt2 = EC_POINT_new (Params_group(p)));
+  CHECK_A (x = BN_new ());
+  CHECK_A (y = BN_new ());
+  CHECK_C (Params_rand_point (p, pt));
+  CHECK_C (Params_rand_point (p, pt2));
+
+  CHECK_C (Params_point_to_exponent(p, x, pt));
+  CHECK_C (Params_point_to_exponent(p, y, pt));
+  EXPECT_TRUE (BN_cmp (x, y) == 0);
+
+  CHECK_C (Params_point_to_exponent(p, y, pt2));
+  EXPECT_FALSE (BN_cmp (x, y) == 0);
+
+cleanup:
+  if (x) BN_free (x);
+  if (y) BN_free (y);
+  if (pt) EC_POINT_free(pt);
+  if (pt2) EC_POINT_free(pt2);
+  EXPECT_TRUE (rv);
+}
+
 TEST_P (ParamTest, HashToExp) {
   int rv = ERROR;
   BIGNUM *x = NULL;

@@ -50,6 +50,15 @@ inline int min (int a, int b) {
   return (a < b) ? a : b;
 }
 
+/* Print BIGNUM to stdout. */
+#define BN_DEBUG(t, a) do { printf("%s: ", t); BN_print_fp(stdout, a); printf("\n"); } while(0);
+
+/* Print EC_POINT to stdout. */
+#define EC_DEBUG(t, group, point, ctx) do { \
+  char* c = EC_POINT_point2hex(group, point, POINT_CONVERSION_UNCOMPRESSED, ctx);\
+  printf("%s: %s\n", t, c); \
+  free(c); } while(0);
+
 #ifdef __cplusplus
 }
 #endif

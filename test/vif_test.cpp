@@ -20,41 +20,45 @@
 #include "src/vif.h"
 #include "src/vrf.h"
 
-TEST(VRF, Prove) {
+TEST(VIF, KeyGen) {
   int rv = ERROR;
   Params p = NULL;
+  EC_POINT *mpk = NULL;
+  EC_POINT *pk_vrf = NULL;
   EC_POINT *pk = NULL;
-  EC_POINT *pk_bad = NULL;
+  BIGNUM *msk = NULL;
+  BIGNUM *sk_vrf = NULL;
   BIGNUM *sk = NULL;
-  BIGNUM *val = NULL;
-  VRFProof pf = NULL;
+  VIFProof pf = NULL;
   const uint8_t input[] = "www.example.com";
   const uint8_t input_bad[] = "www.evil.com";
  
   CHECK_A (p = Params_new (P256));
-  CHECK_A (pf = VRFProof_new (p));
+  CHECK_A (pf = VIFProof_new (p));
+  CHECK_A (mpk = Params_point_new(p));
+  CHECK_A (msk = BN_new());
+  CHECK_A (pk_vrf = Params_point_new(p));
+  CHECK_A (sk_vrf = BN_new());
   CHECK_A (pk = Params_point_new(p));
   CHECK_A (sk = BN_new());
-  CHECK_A (val = BN_new());
-  CHECK_A (pk_bad = Params_point_new(p));
-  CHECK_C (Params_rand_point (p, pk_bad));
 
-  CHECK_C (VRF_keygen (p, pk, sk));
-  CHECK_C (VRF_eval (p, sk, input, sizeof input, val, pf));
-  EXPECT_EQ (VRF_verify (p, pk, input, sizeof input, val, pf), OKAY);
-  EXPECT_EQ (VRF_verify (p, pk, input_bad, sizeof input_bad, val, pf), ERROR);
-  EXPECT_EQ (VRF_verify (p, pk, input, sizeof input_bad, val, pf), ERROR);
-  EXPECT_EQ (VRF_verify (p, pk, input, 0, val, pf), ERROR);
-  EXPECT_EQ (VRF_verify (p, pk_bad, input, sizeof input, val, pf), ERROR);
-  EXPECT_EQ (VRF_verify (p, pk, input, sizeof input, sk, pf), ERROR);
+  CHECK_C (VRF_keygen (p, mpk, msk));
+  CHECK_C (VRF_keygen (p, pk_vrf, sk_vrf));
+  CHECK_C (VIF_eval (p, msk, sk_vrf, input, sizeof input, sk, pk, pf));
+  EXPECT_EQ (VIF_verify (p, mpk, pk_vrf, input, sizeof input, pk, pf), OKAY);
+  EXPECT_EQ (VIF_verify (p, mpk, pk_vrf, input_bad, sizeof input_bad, pk, pf), ERROR);
+  EXPECT_EQ (VIF_verify (p, mpk, pk_vrf, input, sizeof(input_bad) - 1, pk, pf), ERROR);
+  EXPECT_EQ (VIF_verify (p, mpk, pk_vrf, input, 0, pk, pf), ERROR);
+  EXPECT_EQ (VIF_verify (p, pk, pk_vrf, input, sizeof input, pk, pf), ERROR);
+  EXPECT_EQ (VIF_verify (p, mpk, pk_vrf, input, sizeof input, mpk, pf), ERROR);
 
 cleanup:
+  if (mpk) EC_POINT_clear_free (mpk);
+  if (msk) BN_clear_free (msk);
   if (pk) EC_POINT_clear_free (pk);
   if (sk) BN_clear_free (sk);
   if (p) Params_free (p);
-  if (pf) VRFProof_free (pf);
-  if (pk_bad) EC_POINT_clear_free(pk_bad);
-  if (val) BN_clear_free(val);
+  if (pf) VIFProof_free (pf);
   EXPECT_TRUE (rv == OKAY);
 }
 

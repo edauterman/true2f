@@ -6,7 +6,11 @@ penv = env.Clone()
 
 src = [
     "ddh_test.cpp",
+    "keygen_test.cpp",
     "params_test.cpp",
+    "sanitizable_ecdsa_test.cpp",
+    "u2f_test.cpp",
+    "vif_test.cpp",
     "vrf_test.cpp",
 ]
 
