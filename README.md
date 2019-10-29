@@ -3,5 +3,5 @@
 Dependencies:
 * [scons](http://scons.org/)
 * [OpenSSL](http://openssl.org/), version 1.1.1
-* [googletest](https://github.com/google/googletest), version 1.8.0 (or newer?)
+* [googletest](https://github.com/google/googletest), version 1.8.0 (or newer?)(1.10.0 can not)
 
